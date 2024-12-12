@@ -1,0 +1,9 @@
+reminder:
+    time: "18:39"
+plugins:
+    jira:
+        enabled: true
+        base_url: https://jira.example.com
+    github:
+        enabled: true
+        api_token: github_token
