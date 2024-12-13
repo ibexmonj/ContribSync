@@ -16,6 +16,12 @@ func main() {
 		return
 	}
 
+	// Validate configuration
+	if err := config.ValidateConfig(cfg); err != nil {
+		fmt.Printf("Invalid configuration: %v\n", err)
+		return
+	}
+
 	// Check if a command is provided
 	if len(os.Args) < 2 {
 		commands.Help()
@@ -46,7 +52,8 @@ func main() {
 			commands.ShowConfig(cfg)
 		}
 	case "reminder":
-		commands.ReminderCommand(cfg)
+		args := os.Args[2:] // Pass subcommands like "test"
+		commands.ReminderCommand(cfg, args)
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 		commands.Help()

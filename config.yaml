@@ -1,9 +1,11 @@
 reminder:
-    time: "18:39"
+    time: "17:00"
+    title: Default title
+    message: Default message
 plugins:
     jira:
-        enabled: true
-        base_url: https://jira.example.com
+        enabled: false
+        base_url: ""
     github:
-        enabled: true
-        api_token: github_token
+        enabled: false
+        api_token: ""
