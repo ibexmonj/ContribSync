@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"github.com/ibexmonj/ContribSync/config"
+	"github.com/ibexmonj/ContribSync/utils"
 	"regexp"
 )
 
@@ -20,15 +21,19 @@ func SetConfig(cfg *config.Config, key, value string) error {
 	case "reminder.time":
 		// Validate time format
 		if err := validateTimeFormat(value); err != nil {
+			utils.Logger.Warn().Str("key", key).Str("value", value).Msg("Invalid time format")
 			return err
 		}
 		cfg.Reminder.Time = value
+		utils.Logger.Info().Str("key", key).Str("value", value).Msg("Updated configuration")
 	case "reminder.title":
 		// Ensure title is not empty
 		if value == "" {
+			utils.Logger.Warn().Str("key", key).Msg("Empty title value")
 			return fmt.Errorf("reminder title cannot be empty")
 		}
 		cfg.Reminder.Title = value
+		utils.Logger.Info().Str("key", key).Str("value", value).Msg("Updated configuration")
 	case "reminder.message":
 		// Ensure message is not empty
 		if value == "" {
@@ -42,6 +47,7 @@ func SetConfig(cfg *config.Config, key, value string) error {
 	case "plugins.github.api_token":
 		cfg.Plugins.GitHub.APIToken = value
 	default:
+		utils.Logger.Warn().Str("key", key).Msg("Unknown configuration key")
 		return fmt.Errorf("unknown configuration key: %s", key)
 	}
 
