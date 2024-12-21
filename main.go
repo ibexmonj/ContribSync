@@ -1,82 +1,46 @@
 package main
 
 import (
-	"fmt"
+	"github.com/ibexmonj/ContribSync/plugins"
+	"github.com/spf13/cobra"
 	"os"
 
 	"github.com/ibexmonj/ContribSync/commands"
-	"github.com/ibexmonj/ContribSync/config"
 	"github.com/ibexmonj/ContribSync/utils"
 )
 
 func main() {
-	// Initialize logger with configurable log level
-	logLevel := os.Getenv("LOG_LEVEL") // Use an environment variable for log level
-	if logLevel == "" {
-		logLevel = "info" // Default to info level
-	}
-
-	if err := utils.InitLogger(logLevel); err != nil {
-		fmt.Printf("Failed to initialize logger: %v\n", err)
+	// Initialize logger
+	if err := utils.InitLogger("info"); err != nil {
+		utils.Logger.Fatal().Err(err).Msg("Failed to initialize logger")
 		os.Exit(1)
 	}
+
 	utils.Logger.Info().Msg("Starting csync application")
 
-	// Load configuration
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		utils.Logger.Error().Err(err).Msg("Failed to load configuration")
-		fmt.Printf("Error loading config: %v\n", err)
-		return
+	// Root command
+	var rootCmd = &cobra.Command{
+		Use:   "csync",
+		Short: "Csync - Contribution Sync CLI",
+		Long:  "Csync helps manage and log your contributions across various platforms.",
 	}
 
-	// Validate configuration
-	if err := config.ValidateConfig(cfg); err != nil {
-		utils.Logger.Error().Err(err).Msg("Invalid configuration")
-		fmt.Printf("Invalid configuration: %v\n", err)
-		return
-	}
+	// Add subcommands
+	rootCmd.AddCommand(commands.NewConfigCommand())
+	rootCmd.AddCommand(commands.NewReminderCommand())
+	//	rootCmd.AddCommand(commands.NewHelpCommand())
+	rootCmd.AddCommand(commands.NewCompletionCommand())
 
-	// Check if a command is provided
-	if len(os.Args) < 2 {
-		commands.Help()
-		return
-	}
+	// Initialize the PluginManager
+	pluginManager := plugins.NewPluginManager()
+	pluginManager.LoadCorePlugins()
 
-	// Parse the command
-	command := os.Args[1]
+	// Add plugin commands
+	rootCmd.AddCommand(commands.NewPluginCommand(pluginManager))
 
-	// Handle commands
-	switch command {
-	case "help":
-		utils.Logger.Info().Msg("Executing 'help' command")
-		commands.Help()
-	case "config":
-		utils.Logger.Info().Msg("Executing 'config' command")
-		if len(os.Args) > 2 && os.Args[2] == "set" {
-			if len(os.Args) < 5 {
-				fmt.Println("Usage: csync config set <key> <value>")
-				return
-			}
-			key := os.Args[3]
-			value := os.Args[4]
-			if err := commands.SetConfig(cfg, key, value); err != nil {
-				utils.Logger.Error().Err(err).Msg("Error setting config")
-				fmt.Printf("Error: %v\n", err)
-			} else {
-				utils.Logger.Info().Str("key", key).Str("value", value).Msg("Config updated")
-				fmt.Println("Configuration updated successfully.")
-			}
-		} else {
-			commands.ShowConfig(cfg)
-		}
-	case "reminder":
-		utils.Logger.Info().Msg("Executing 'reminder' command")
-		args := os.Args[2:] // Pass subcommands like "test"
-		commands.ReminderCommand(cfg, args)
-	default:
-		utils.Logger.Warn().Str("command", command).Msg("Unknown command")
-		fmt.Printf("Unknown command: %s\n", command)
-		commands.Help()
+	// Execute the root command
+	if err := rootCmd.Execute(); err != nil {
+		utils.Logger.Fatal().Err(err).Msg("Failed to execute command")
+		os.Exit(1)
 	}
 }

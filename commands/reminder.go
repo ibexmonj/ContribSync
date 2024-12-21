@@ -3,6 +3,8 @@ package commands
 import (
 	"fmt"
 	"github.com/gen2brain/beeep"
+	"github.com/ibexmonj/ContribSync/utils"
+	"github.com/spf13/cobra"
 	"os/exec"
 	"time"
 
@@ -68,4 +70,42 @@ func TestReminder(cfg *config.Config) {
 	} else {
 		fmt.Println("Test notification sent successfully!")
 	}
+}
+
+func NewReminderCommand() *cobra.Command {
+	var reminderCmd = &cobra.Command{
+		Use:   "reminder",
+		Short: "Manage reminders",
+		Long:  "Start or test the reminder service.",
+	}
+
+	reminderCmd.AddCommand(&cobra.Command{
+		Use:   "start",
+		Short: "Start the reminder service",
+		Run: func(cmd *cobra.Command, args []string) {
+			cfg, err := config.LoadConfig()
+			if err != nil {
+				utils.Logger.Error().Err(err).Msg("Failed to load configuration")
+				fmt.Printf("Error loading config: %v\n", err)
+				return
+			}
+			StartReminder(cfg)
+		},
+	})
+
+	reminderCmd.AddCommand(&cobra.Command{
+		Use:   "test",
+		Short: "Send a test reminder notification",
+		Run: func(cmd *cobra.Command, args []string) {
+			cfg, err := config.LoadConfig()
+			if err != nil {
+				utils.Logger.Error().Err(err).Msg("Failed to load configuration")
+				fmt.Printf("Error loading config: %v\n", err)
+				return
+			}
+			TestReminder(cfg)
+		},
+	})
+
+	return reminderCmd
 }

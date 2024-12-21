@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/ibexmonj/ContribSync/config"
 	"github.com/ibexmonj/ContribSync/utils"
+	"github.com/spf13/cobra"
 	"regexp"
 )
 
@@ -62,4 +63,52 @@ func validateTimeFormat(timeStr string) error {
 		return fmt.Errorf("invalid time format: %s (expected HH:MM)", timeStr)
 	}
 	return nil
+}
+func NewConfigCommand() *cobra.Command {
+	var configCmd = &cobra.Command{
+		Use:   "config",
+		Short: "Manage configuration",
+		Long:  "View or update configuration for csync.",
+	}
+
+	configCmd.AddCommand(&cobra.Command{
+		Use:   "show",
+		Short: "Show current configuration",
+		Run: func(cmd *cobra.Command, args []string) {
+			cfg, err := config.LoadConfig()
+			if err != nil {
+				utils.Logger.Error().Err(err).Msg("Failed to load configuration")
+				fmt.Printf("Error loading config: %v\n", err)
+				return
+			}
+			ShowConfig(cfg)
+		},
+	})
+
+	configCmd.AddCommand(&cobra.Command{
+		Use:   "set [key] [value]",
+		Short: "Set a configuration value",
+		Args:  cobra.ExactArgs(2),
+		Run: func(cmd *cobra.Command, args []string) {
+			cfg, err := config.LoadConfig()
+			if err != nil {
+				utils.Logger.Error().Err(err).Msg("Failed to load configuration")
+				fmt.Printf("Error loading config: %v\n", err)
+				return
+			}
+
+			key := args[0]
+			value := args[1]
+			if err := SetConfig(cfg, key, value); err != nil {
+				utils.Logger.Error().Err(err).Str("key", key).Str("value", value).Msg("Failed to set configuration")
+				fmt.Printf("Error: %v\n", err)
+				return
+			}
+
+			utils.Logger.Info().Str("key", key).Str("value", value).Msg("Configuration updated successfully")
+			fmt.Println("Configuration updated successfully.")
+		},
+	})
+
+	return configCmd
 }
