@@ -113,8 +113,7 @@ _This requires the OpenAI API key to be set._
 ## 🚀 We’re Adding Features Regularly!
 
 This project is evolving, and we’re actively adding new integrations and improvements.
-Watch this space for updates!
-Want to suggest a feature? Open an issue or a pull request! 🚀
+Watch this space for updates! 🚀
 
 ## 📜 License
 
@@ -125,9 +124,9 @@ This project is licensed under the [MIT License.](LICENSE)
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute.
 
 ## 🛠️ Future Roadmap
-•	GitHub Integration (track PRs, commits, issues)
-•	Slack & Teams Notifications
-•	Export Summaries as JSON or Markdown
+•	GitHub Integration (track PRs, commits, issues)  
+•	Slack & Teams Notifications  
+•	Export Summaries as JSON or Markdown  
 
 ## 🌟 Support & Feedback
 
