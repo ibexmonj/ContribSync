@@ -42,6 +42,11 @@ func (p *JiraPlugin) Execute(args []string) error {
 			return fmt.Errorf("usage: create-issue <summary> <description>")
 		}
 		return p.createIssue(args[1], args[2])
+	case "list-issues":
+		if len(args) < 2 {
+			return fmt.Errorf("usage: list-issues <projectKey>")
+		}
+		return p.listIssues(args[1])
 	default:
 		return fmt.Errorf("unknown Jira command: %s", args[0])
 	}
@@ -111,5 +116,55 @@ func (p *JiraPlugin) createIssue(summary, description string) error {
 	}
 
 	fmt.Println("Jira issue created successfully!")
+	return nil
+}
+
+func (p *JiraPlugin) listIssues(projectKey string) error {
+	url := fmt.Sprintf("%s/rest/api/3/search?jql=project=%s", p.baseURL, projectKey)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %v", err)
+	}
+
+	req.SetBasicAuth(p.email, p.apiToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %v", err)
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to fetch issues, status: %s, response: %s", resp.Status, string(body))
+	}
+
+	// Parse the response body
+	var result struct {
+		Issues []struct {
+			Key    string `json:"key"`
+			Fields struct {
+				Summary string `json:"summary"`
+			} `json:"fields"`
+		} `json:"issues"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	// Display the issues
+	fmt.Printf("Issues for project %s:\n", projectKey)
+	for _, issue := range result.Issues {
+		fmt.Printf("- %s: %s\n", issue.Key, issue.Fields.Summary)
+	}
+
 	return nil
 }
