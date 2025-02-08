@@ -273,11 +273,18 @@ func (p *JiraPlugin) generateAISummary(userEmail string, issues []struct {
 	} else {
 		fmt.Println("ℹ️ No OpenAI Org ID set, using default.")
 	}
-	prompt := "Summarize the following Jira contributions in a professional format:\n\n"
+	formattedIssuesText := ""
 	for _, issue := range issues {
-		prompt += fmt.Sprintf("- %s [%s]: %s (Status: %s, Updated: %s)\n",
-			issue.Key, issue.IssueType, issue.Summary, issue.Status, issue.Updated)
+		formattedIssuesText += fmt.Sprintf("- [%s] %s: %s (Status: %s, Updated: %s)\n",
+			issue.IssueType, issue.Key, issue.Summary, issue.Status, issue.Updated)
 	}
+
+	prompt := fmt.Sprintf(`
+      I am preparing a self-evaluation for my work. Please summarize my Jira contributions in a professional yet concise way. 
+      Focus on the impact of my work rather than just listing tasks. Frame the summary as if I am describing my achievements for a performance review. 
+
+      Here are my recent Jira contributions:
+      %s`, formattedIssuesText)
 
 	payload := map[string]interface{}{
 		//"model": "gpt-4",
