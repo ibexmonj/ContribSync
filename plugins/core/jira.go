@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"time"
 )
 
 // JiraPlugin represents the Jira integration plugin
@@ -47,6 +49,11 @@ func (p *JiraPlugin) Execute(args []string) error {
 			return fmt.Errorf("usage: list-issues <projectKey>")
 		}
 		return p.listIssues(args[1])
+	case "assigned-issues":
+		if len(args) < 2 {
+			return fmt.Errorf("usage: assigned-issues <userEmail>")
+		}
+		return p.assignedIssues(args[1])
 	default:
 		return fmt.Errorf("unknown Jira command: %s", args[0])
 	}
@@ -164,6 +171,73 @@ func (p *JiraPlugin) listIssues(projectKey string) error {
 	fmt.Printf("Issues for project %s:\n", projectKey)
 	for _, issue := range result.Issues {
 		fmt.Printf("- %s: %s\n", issue.Key, issue.Fields.Summary)
+	}
+
+	return nil
+}
+
+func (p *JiraPlugin) assignedIssues(userEmail string) error {
+	// Properly encode JQL query
+	jql := fmt.Sprintf("assignee='%s' ORDER BY updated DESC", userEmail)
+	encodedJQL := url.QueryEscape(jql)
+
+	// Construct request URL
+	url := fmt.Sprintf("%s/rest/api/3/search?jql=%s", p.baseURL, encodedJQL)
+
+	fmt.Println("Final Request URL:", url) // Debugging output
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %v", err)
+	}
+
+	req.SetBasicAuth(p.email, p.apiToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second} // Increased timeout
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to fetch assigned issues, status: %s, response: %s", resp.Status, string(body))
+	}
+
+	// Parse response
+	var result struct {
+		Issues []struct {
+			Key    string `json:"key"`
+			Fields struct {
+				Summary   string `json:"summary"`
+				IssueType struct {
+					Name string `json:"name"`
+				} `json:"issuetype"`
+				Status struct {
+					Name string `json:"name"`
+				} `json:"status"`
+				Updated string `json:"updated"`
+			} `json:"fields"`
+		} `json:"issues"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	// Handle case where no issues are found
+	if len(result.Issues) == 0 {
+		fmt.Printf("📌 No issues assigned to %s.\n", userEmail)
+		return nil
+	}
+
+	// Display issues
+	fmt.Printf("📌 Issues assigned to %s:\n", userEmail)
+	for _, issue := range result.Issues {
+		fmt.Printf("- %s [%s]: %s (Status: %s, Updated: %s)\n",
+			issue.Key, issue.Fields.IssueType.Name, issue.Fields.Summary, issue.Fields.Status.Name, issue.Fields.Updated)
 	}
 
 	return nil
