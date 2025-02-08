@@ -140,9 +140,9 @@ func (p *JiraPlugin) createIssue(summary, description string) error {
 }
 
 func (p *JiraPlugin) listIssues(projectKey string) error {
-	url := fmt.Sprintf("%s/rest/api/3/search?jql=project=%s", p.baseURL, projectKey)
+	jiraSearchUrl := fmt.Sprintf("%s/rest/api/3/search?jql=project=%s", p.baseURL, projectKey)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", jiraSearchUrl, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %v", err)
 	}
@@ -192,12 +192,11 @@ func (p *JiraPlugin) listIssues(projectKey string) error {
 func (p *JiraPlugin) assignedIssues(userEmail string) error {
 	jql := fmt.Sprintf("assignee='%s' ORDER BY updated DESC", userEmail)
 	encodedJQL := url.QueryEscape(jql)
+	jiraSearchUrl := fmt.Sprintf("%s/rest/api/3/search?jql=%s", p.baseURL, encodedJQL)
 
-	url := fmt.Sprintf("%s/rest/api/3/search?jql=%s", p.baseURL, encodedJQL)
+	fmt.Println("Final Request URL:", jiraSearchUrl) // Debugging output
 
-	fmt.Println("Final Request URL:", url) // Debugging output
-
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", jiraSearchUrl, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %v", err)
 	}
@@ -210,7 +209,12 @@ func (p *JiraPlugin) assignedIssues(userEmail string) error {
 	if err != nil {
 		return fmt.Errorf("failed to send request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -308,7 +312,11 @@ func (p *JiraPlugin) generateAISummary(userEmail string, issues []struct {
 	if err != nil {
 		return fmt.Errorf("failed to send request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+		}
+	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -348,9 +356,9 @@ func (p *JiraPlugin) fetchAssignedIssues(userEmail string) ([]struct {
 	encodedJQL := url.QueryEscape(jql)
 
 	// Construct request URL
-	url := fmt.Sprintf("%s/rest/api/3/search?jql=%s", p.baseURL, encodedJQL)
+	jiraSearchUrl := fmt.Sprintf("%s/rest/api/3/search?jql=%s", p.baseURL, encodedJQL)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", jiraSearchUrl, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
