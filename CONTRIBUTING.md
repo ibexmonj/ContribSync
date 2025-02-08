@@ -9,6 +9,6 @@ Thank you for your interest in contributing! Improvements, feature ideas, and bu
 
 2. **Clone Your Fork**
    ```sh
-   git clone https://github.com/your-username/ContribSync.git
+   git clone https://github.com/ibexmonj/ContribSync.git
    cd ContribSync
     ```
