@@ -1,5 +1,9 @@
 # 🚀 ContribSync (`csync`) - Track & Summarize Your Contributions
 
+
+⚠️ **This is an early-stage open-source project.**
+
+
 ContribSync (`csync`) is a CLI tool that helps individual contributors track their work across multiple platforms, generate AI-powered summaries, and streamline performance reviews.
 
 ## 📌 Features
@@ -59,18 +63,49 @@ export OPENAI_ORG=your-org-id
 ```sh  
 ./csync plugin exec jira create-issue "Optimize Sync Performance" "Improve background sync to reduce CPU usage."
 ```
+Sample Output:
+``` 
+Issue created successfully:
+Key: CSYNC-101
+Summary: Optimize Sync Performance
+```
 
 📌 List Issues in a Project
 ```sh
 ./csync plugin exec jira list-issues PROJECT_KEY //project key under JIRA project settings
 ```
+Sample Output:
+```
+Issues in PROJECT_KEY:
+- CSYNC-101: Optimize Sync Performance (To Do)
+- CSYNC-102: Implement API Rate Limiting (In Progress)
+- CSYNC-103: Fix Sync Conflict Errors (Done)
+```
+
 📌 Find Issues Assigned to a User
 ```sh
 ./csync plugin exec jira assigned-issues your-email@example.com
 ```
+Sample Output:
+```
+📌 Issues assigned to your-email@example.com:
+- CSYNC-101: Optimize Sync Performance (To Do)
+- CSYNC-102: Implement API Rate Limiting (In Progress)
+- CSYNC-103: Fix Sync Conflict Errors (Done)
+```
+
 📌 Generate AI-Powered Summary for Self-Evaluation
 ```sh
 ./csync plugin exec jira summary your-email@example.com
+```
+Sample Output:
+```
+📌 AI-Generated Self-Evaluation Summary:
+Over the past cycle, I worked on key improvements to our CloudSync platform:
+- Resolved **file synchronization conflicts**, preventing duplicate file issues (CSYNC-103).
+- Implemented **API rate limiting**, improving system stability under heavy load (CSYNC-102).
+- Optimized **background sync performance**, reducing CPU usage and increasing efficiency (CSYNC-101).
+These contributions enhanced platform reliability and performance, benefiting both end users and internal teams.
 ```
 _This requires the OpenAI API key to be set._
 
