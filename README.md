@@ -21,7 +21,7 @@ ContribSync (`csync`) is a CLI tool that helps individual contributors track the
 ## 🛠️ Setup & Running Locally
 
 ### Prerequisites
-- Go **1.19+** installed
+- Go **1.22.4+** installed
 - Jira API access (API token required)
 - (Optional) OpenAI API key for AI-generated summaries
 
@@ -62,7 +62,7 @@ export OPENAI_ORG=your-org-id
 
 📌 List Issues in a Project
 ```sh
-./csync plugin exec jira list-issues PROJECT_KEY
+./csync plugin exec jira list-issues PROJECT_KEY //project key under JIRA project settings
 ```
 📌 Find Issues Assigned to a User
 ```sh
