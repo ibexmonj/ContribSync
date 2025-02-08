@@ -54,6 +54,19 @@ func (p *JiraPlugin) Execute(args []string) error {
 			return fmt.Errorf("usage: assigned-issues <userEmail>")
 		}
 		return p.assignedIssues(args[1])
+	case "summary":
+		if len(args) < 2 {
+			return fmt.Errorf("usage: summary <userEmail>")
+		}
+
+		// Fetch assigned issues
+		issues, err := p.fetchAssignedIssues(args[1])
+		if err != nil {
+			return err
+		}
+
+		// Call AI Summary function
+		return p.generateAISummary(args[1], issues)
 	default:
 		return fmt.Errorf("unknown Jira command: %s", args[0])
 	}
@@ -177,11 +190,9 @@ func (p *JiraPlugin) listIssues(projectKey string) error {
 }
 
 func (p *JiraPlugin) assignedIssues(userEmail string) error {
-	// Properly encode JQL query
 	jql := fmt.Sprintf("assignee='%s' ORDER BY updated DESC", userEmail)
 	encodedJQL := url.QueryEscape(jql)
 
-	// Construct request URL
 	url := fmt.Sprintf("%s/rest/api/3/search?jql=%s", p.baseURL, encodedJQL)
 
 	fmt.Println("Final Request URL:", url) // Debugging output
@@ -227,13 +238,11 @@ func (p *JiraPlugin) assignedIssues(userEmail string) error {
 		return fmt.Errorf("failed to parse response: %v", err)
 	}
 
-	// Handle case where no issues are found
 	if len(result.Issues) == 0 {
 		fmt.Printf("📌 No issues assigned to %s.\n", userEmail)
 		return nil
 	}
 
-	// Display issues
 	fmt.Printf("📌 Issues assigned to %s:\n", userEmail)
 	for _, issue := range result.Issues {
 		fmt.Printf("- %s [%s]: %s (Status: %s, Updated: %s)\n",
@@ -241,4 +250,170 @@ func (p *JiraPlugin) assignedIssues(userEmail string) error {
 	}
 
 	return nil
+}
+
+func (p *JiraPlugin) generateAISummary(userEmail string, issues []struct {
+	Key       string
+	Summary   string
+	IssueType string
+	Status    string
+	Updated   string
+}) error {
+
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	orgID := os.Getenv("OPENAI_ORG")
+
+	if apiKey == "" {
+		return fmt.Errorf("OPENAI_API_KEY is not set. Please export your API key.")
+	}
+	// Debugging: Print masked API key and check if org ID exists
+	fmt.Println("✅ Using OpenAI API Key (masked):", apiKey[:5]+"****")
+	if orgID != "" {
+		fmt.Println("✅ Using OpenAI Org ID:", orgID)
+	} else {
+		fmt.Println("ℹ️ No OpenAI Org ID set, using default.")
+	}
+	prompt := "Summarize the following Jira contributions in a professional format:\n\n"
+	for _, issue := range issues {
+		prompt += fmt.Sprintf("- %s [%s]: %s (Status: %s, Updated: %s)\n",
+			issue.Key, issue.IssueType, issue.Summary, issue.Status, issue.Updated)
+	}
+
+	payload := map[string]interface{}{
+		//"model": "gpt-4",
+		"model": "gpt-3.5-turbo",
+		"messages": []map[string]string{
+			{"role": "system", "content": "You are an assistant summarizing Jira issue contributions."},
+			{"role": "user", "content": prompt},
+		},
+		"max_tokens": 200,
+	}
+
+	jsonPayload, _ := json.Marshal(payload)
+
+	req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %v", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+	//orgid header
+	if orgID != "" {
+		req.Header.Set("OpenAI-Organization", orgID)
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to get AI summary, status: %s, response: %s", resp.Status, string(body))
+	}
+
+	var result struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("failed to parse AI response: %v", err)
+	}
+
+	if len(result.Choices) > 0 {
+		fmt.Println("\n📌 AI-Generated Summary:\n" + result.Choices[0].Message.Content)
+	} else {
+		fmt.Println("\n⚠️ AI did not return a summary.")
+	}
+
+	return nil
+}
+
+func (p *JiraPlugin) fetchAssignedIssues(userEmail string) ([]struct {
+	Key       string
+	Summary   string
+	IssueType string
+	Status    string
+	Updated   string
+}, error) {
+	// Properly encode JQL query
+	jql := fmt.Sprintf("assignee='%s' ORDER BY updated DESC", userEmail)
+	encodedJQL := url.QueryEscape(jql)
+
+	// Construct request URL
+	url := fmt.Sprintf("%s/rest/api/3/search?jql=%s", p.baseURL, encodedJQL)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %v", err)
+	}
+
+	req.SetBasicAuth(p.email, p.apiToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to fetch assigned issues, status: %s, response: %s", resp.Status, string(body))
+	}
+
+	// Parse response
+	var result struct {
+		Issues []struct {
+			Key    string `json:"key"`
+			Fields struct {
+				Summary   string `json:"summary"`
+				IssueType struct {
+					Name string `json:"name"`
+				} `json:"issuetype"`
+				Status struct {
+					Name string `json:"name"`
+				} `json:"status"`
+				Updated string `json:"updated"`
+			} `json:"fields"`
+		} `json:"issues"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	// Convert to expected return format
+	var formattedIssues []struct {
+		Key       string
+		Summary   string
+		IssueType string
+		Status    string
+		Updated   string
+	}
+	for _, issue := range result.Issues {
+		formattedIssues = append(formattedIssues, struct {
+			Key       string
+			Summary   string
+			IssueType string
+			Status    string
+			Updated   string
+		}{
+			Key:       issue.Key,
+			Summary:   issue.Fields.Summary,
+			IssueType: issue.Fields.IssueType.Name,
+			Status:    issue.Fields.Status.Name,
+			Updated:   issue.Fields.Updated,
+		})
+	}
+
+	return formattedIssues, nil
 }
