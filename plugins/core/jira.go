@@ -266,13 +266,6 @@ func (p *JiraPlugin) generateAISummary(userEmail string, issues []struct {
 	if apiKey == "" {
 		return fmt.Errorf("OPENAI_API_KEY is not set. Please export your API key.")
 	}
-	// Debugging: Print masked API key and check if org ID exists
-	fmt.Println("✅ Using OpenAI API Key (masked):", apiKey[:5]+"****")
-	if orgID != "" {
-		fmt.Println("✅ Using OpenAI Org ID:", orgID)
-	} else {
-		fmt.Println("ℹ️ No OpenAI Org ID set, using default.")
-	}
 	formattedIssuesText := ""
 	for _, issue := range issues {
 		formattedIssuesText += fmt.Sprintf("- [%s] %s: %s (Status: %s, Updated: %s)\n",
@@ -280,8 +273,8 @@ func (p *JiraPlugin) generateAISummary(userEmail string, issues []struct {
 	}
 
 	prompt := fmt.Sprintf(`
-      I am preparing a self-evaluation for my work. Please summarize my Jira contributions in a professional yet concise way. 
-      Focus on the impact of my work rather than just listing tasks. Frame the summary as if I am describing my achievements for a performance review. 
+      I am preparing a self-evaluation for my work. Please summarize my Jira contributions in a professional yet concise way.
+      Focus on the impact of my work rather than just listing tasks. Frame the summary as if I am describing my achievements for a performance review.
 
       Here are my recent Jira contributions:
       %s`, formattedIssuesText)
