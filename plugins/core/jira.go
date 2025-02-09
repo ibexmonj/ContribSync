@@ -292,7 +292,7 @@ func (p *JiraPlugin) generateAISummary(userEmail string, issues []struct {
       %s
 
       Respond in the first person, starting with "I...".
-      Do not refer to me in the third person.
+      Use natural language that sounds like something I would say in a self-assessment.
       Keep it concise and focused on impact.`, formattedIssuesText.String())
 
 	payload := map[string]interface{}{
