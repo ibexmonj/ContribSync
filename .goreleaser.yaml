@@ -1,0 +1,33 @@
+project_name: "csync"
+release:
+  github:
+    owner: ibexmonj
+    name: ContribSync
+
+builds:
+  - id: csync
+    main: ./main.go
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - "-s -w"
+
+archives:
+  - format: tar.gz
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "{{ .ProjectName }}_checksums.txt"
+
+snapshot:
+  name_template: "{{ .Tag }}-next"
+
+changelog:
+  use: github
