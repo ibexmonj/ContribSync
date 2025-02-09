@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -18,21 +19,90 @@ type JiraPlugin struct {
 	email    string
 }
 
-func (p *JiraPlugin) Init() error {
-	fmt.Println("Initializing Jira plugin...")
+func (p *JiraPlugin) LoadEnvVars() error {
 	p.baseURL = os.Getenv("JIRA_BASE_URL")
 	p.email = os.Getenv("JIRA_EMAIL")
 	p.apiToken = os.Getenv("JIRA_API_TOKEN")
 
 	if p.baseURL == "" || p.apiToken == "" || p.email == "" {
-		return fmt.Errorf("JIRA_BASE_URL, JIRA_API_TOKEN, or JIRA_EMAIL is not set in environment variables")
+		return fmt.Errorf("missing required environment variables")
 	}
+	return nil
+}
+func toJSON(v interface{}) ([]byte, error) {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return nil, fmt.Errorf("JSON marshaling error: %w", err)
+	}
+	return data, nil
+}
 
-	fmt.Println("Jira plugin initialized with base URL:", p.baseURL)
-	fmt.Printf("Using email: %s, API token length: %d\n", p.email, len(p.apiToken))
+func wrapError(msg string, err error) error {
+	if err != nil {
+		return fmt.Errorf("%s: %w", msg, err)
+	}
 	return nil
 }
 
+func (p *JiraPlugin) Init() error {
+	fmt.Println("Initializing Jira plugin...")
+	if err := p.LoadEnvVars(); err != nil {
+		return err
+	}
+	fmt.Println("Jira plugin initialized with base URL:", p.baseURL)
+	return nil
+}
+
+func (p *JiraPlugin) makeRequest(method, endpoint string, body io.Reader, isOpenAI bool) (*http.Response, error) {
+	var fullURL string
+	reqHeaders := make(map[string]string)
+
+	if strings.HasPrefix(endpoint, "http") {
+		fullURL = endpoint
+	} else {
+		fullURL = p.baseURL + endpoint
+	}
+
+	req, err := http.NewRequest(method, fullURL, body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	if isOpenAI {
+		apiKey := os.Getenv("OPENAI_API_KEY")
+		orgID := os.Getenv("OPENAI_ORG")
+
+		if apiKey == "" {
+			return nil, fmt.Errorf("OPENAI_API_KEY is not set. Please export your API key.")
+		}
+
+		reqHeaders["Authorization"] = "Bearer " + apiKey
+		reqHeaders["Content-Type"] = "application/json"
+		if orgID != "" {
+			reqHeaders["OpenAI-Organization"] = orgID
+		}
+	} else {
+		reqHeaders["Authorization"] = "Basic " + p.apiToken
+		reqHeaders["Content-Type"] = "application/json"
+	}
+
+	for key, value := range reqHeaders {
+		req.Header.Set(key, value)
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	return resp, nil
+}
+
+func HandleResponseBody(body io.ReadCloser) {
+	if err := body.Close(); err != nil {
+		fmt.Println("Warning: failed to close response body:", err)
+	}
+}
 func (p *JiraPlugin) Execute(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("no arguments provided")
@@ -40,10 +110,10 @@ func (p *JiraPlugin) Execute(args []string) error {
 
 	switch args[0] {
 	case "create-issue":
-		if len(args) < 3 {
-			return fmt.Errorf("usage: create-issue <summary> <description>")
+		if len(args) < 4 {
+			return fmt.Errorf("usage: create-issue <projectKey> <summary> <description>")
 		}
-		return p.createIssue(args[1], args[2])
+		return p.CreateIssue(args[1], args[2], args[3])
 	case "list-issues":
 		if len(args) < 2 {
 			return fmt.Errorf("usage: list-issues <projectKey>")
@@ -59,13 +129,11 @@ func (p *JiraPlugin) Execute(args []string) error {
 			return fmt.Errorf("usage: summary <userEmail>")
 		}
 
-		// Fetch assigned issues
 		issues, err := p.fetchAssignedIssues(args[1])
 		if err != nil {
 			return err
 		}
 
-		// Call AI Summary function
 		return p.generateAISummary(args[1], issues)
 	default:
 		return fmt.Errorf("unknown Jira command: %s", args[0])
@@ -76,97 +144,51 @@ func (p *JiraPlugin) Info() (string, string) {
 	return "jira", "Integration with Jira for tracking issues"
 }
 
-func (p *JiraPlugin) createIssue(summary, description string) error {
-	url := p.baseURL + "/rest/api/3/issue"
-	payload := map[string]interface{}{
+func (j *JiraPlugin) CreateIssue(projectKey, summary, description string) error {
+	issue := map[string]interface{}{
 		"fields": map[string]interface{}{
-			"project": map[string]string{"key": "SCRUM"}, // Replace with your project key
-			"summary": summary,
-			"description": map[string]interface{}{
-				"type":    "doc",
-				"version": 1,
-				"content": []map[string]interface{}{
-					{
-						"type": "paragraph",
-						"content": []map[string]interface{}{
-							{
-								"type": "text",
-								"text": description,
-							},
-						},
-					},
-				},
-			},
-			"issuetype": map[string]string{"name": "Task"},
+			"project":     map[string]string{"key": projectKey},
+			"summary":     summary,
+			"description": description,
+			"issuetype":   map[string]string{"name": "Task"},
 		},
 	}
 
-	jsonPayload, _ := json.Marshal(payload)
-
-	fmt.Printf("Payload: %s\n", string(jsonPayload)) // Print the payload
-	fmt.Printf("Request URL: %s\n", url)             // Print the URL
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
+	body, err := toJSON(issue)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %v", err)
+		return wrapError("failed to prepare issue payload", err)
 	}
-	req.SetBasicAuth(p.email, p.apiToken)
 
-	req.Header.Set("Content-Type", "application/json")
-
-	fmt.Println("Request Headers:", req.Header)
-
-	fmt.Println("Authorization Header:", req.Header.Get("Authorization"))
-
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := j.makeRequest("POST", "/rest/api/2/issue", bytes.NewReader(body), false)
 	if err != nil {
-		return fmt.Errorf("failed to send request: %v", err)
+		return wrapError("failed to create Jira issue", err)
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
 
-		}
-	}(resp.Body)
+	defer HandleResponseBody(resp.Body)
+	respBody, _ := io.ReadAll(resp.Body)
+	fmt.Println("Jira Response:", string(respBody))
 
 	if resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		fmt.Printf("Error response: %s\n", string(body)) // Log the full response body
-		return fmt.Errorf("failed to create issue, status: %s, response: %s", resp.Status, string(body))
+		return fmt.Errorf("unexpected response from Jira: %s", resp.Status)
 	}
 
-	fmt.Println("Jira issue created successfully!")
 	return nil
 }
 
 func (p *JiraPlugin) listIssues(projectKey string) error {
-	jiraSearchUrl := fmt.Sprintf("%s/rest/api/3/search?jql=project=%s", p.baseURL, projectKey)
+	endpoint := fmt.Sprintf("/rest/api/2/search?jql=project=\"%s\"", projectKey)
 
-	req, err := http.NewRequest("GET", jiraSearchUrl, nil)
+	resp, err := p.makeRequest("GET", endpoint, nil, false)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %v", err)
+		return wrapError("failed to fetch Jira issues", err)
 	}
-
-	req.SetBasicAuth(p.email, p.apiToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to send request: %v", err)
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-
-		}
-	}(resp.Body)
+	defer HandleResponseBody(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to fetch issues, status: %s, response: %s", resp.Status, string(body))
 	}
 
-	// Parse the response body
 	var result struct {
 		Issues []struct {
 			Key    string `json:"key"`
@@ -180,7 +202,6 @@ func (p *JiraPlugin) listIssues(projectKey string) error {
 		return fmt.Errorf("failed to parse response: %v", err)
 	}
 
-	// Display the issues
 	fmt.Printf("Issues for project %s:\n", projectKey)
 	for _, issue := range result.Issues {
 		fmt.Printf("- %s: %s\n", issue.Key, issue.Fields.Summary)
@@ -192,36 +213,21 @@ func (p *JiraPlugin) listIssues(projectKey string) error {
 func (p *JiraPlugin) assignedIssues(userEmail string) error {
 	jql := fmt.Sprintf("assignee='%s' ORDER BY updated DESC", userEmail)
 	encodedJQL := url.QueryEscape(jql)
-	jiraSearchUrl := fmt.Sprintf("%s/rest/api/3/search?jql=%s", p.baseURL, encodedJQL)
+	endpoint := fmt.Sprintf("/rest/api/2/search?jql=%s", encodedJQL)
 
-	fmt.Println("Final Request URL:", jiraSearchUrl) // Debugging output
+	fmt.Println("Final Request URL:", p.baseURL+endpoint)
 
-	req, err := http.NewRequest("GET", jiraSearchUrl, nil)
+	resp, err := p.makeRequest("GET", endpoint, nil, false)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %v", err)
+		return wrapError("failed to fetch assigned issues", err)
 	}
-
-	req.SetBasicAuth(p.email, p.apiToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 30 * time.Second} // Increased timeout
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to send request: %v", err)
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-
-		}
-	}(resp.Body)
+	defer HandleResponseBody(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to fetch assigned issues, status: %s, response: %s", resp.Status, string(body))
 	}
 
-	// Parse response
 	var result struct {
 		Issues []struct {
 			Key    string `json:"key"`
@@ -265,26 +271,31 @@ func (p *JiraPlugin) generateAISummary(userEmail string, issues []struct {
 }) error {
 
 	apiKey := os.Getenv("OPENAI_API_KEY")
-	orgID := os.Getenv("OPENAI_ORG")
+	os.Getenv("OPENAI_ORG")
 
 	if apiKey == "" {
 		return fmt.Errorf("OPENAI_API_KEY is not set. Please export your API key.")
 	}
-	formattedIssuesText := ""
+
+	var formattedIssuesText strings.Builder
 	for _, issue := range issues {
-		formattedIssuesText += fmt.Sprintf("- [%s] %s: %s (Status: %s, Updated: %s)\n",
-			issue.IssueType, issue.Key, issue.Summary, issue.Status, issue.Updated)
+		formattedIssuesText.WriteString(fmt.Sprintf("- [%s] %s: %s (Status: %s, Updated: %s)\n",
+			issue.IssueType, issue.Key, issue.Summary, issue.Status, issue.Updated))
 	}
 
 	prompt := fmt.Sprintf(`
       I am preparing a self-evaluation for my work. Please summarize my Jira contributions in a professional yet concise way.
-      Focus on the impact of my work rather than just listing tasks. Frame the summary as if I am describing my achievements for a performance review.
+      Focus on the impact of my work rather than just listing tasks. 
+      Frame the summary as if I am personally describing my achievements for a performance review.
 
       Here are my recent Jira contributions:
-      %s`, formattedIssuesText)
+      %s
+
+      Respond in the first person, starting with "I...".
+      Do not refer to me in the third person.
+      Keep it concise and focused on impact.`, formattedIssuesText.String())
 
 	payload := map[string]interface{}{
-		//"model": "gpt-4",
 		"model": "gpt-3.5-turbo",
 		"messages": []map[string]string{
 			{"role": "system", "content": "You are an assistant summarizing Jira issue contributions."},
@@ -293,34 +304,20 @@ func (p *JiraPlugin) generateAISummary(userEmail string, issues []struct {
 		"max_tokens": 200,
 	}
 
-	jsonPayload, _ := json.Marshal(payload)
-
-	req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(jsonPayload))
+	body, err := toJSON(payload)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %v", err)
+		return wrapError("failed to prepare AI request payload", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-	req.Header.Set("Content-Type", "application/json")
-	//orgid header
-	if orgID != "" {
-		req.Header.Set("OpenAI-Organization", orgID)
-	}
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := p.makeRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewReader(body), true)
 	if err != nil {
-		return fmt.Errorf("failed to send request: %v", err)
+		return wrapError("failed to get AI summary", err)
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-		}
-	}(resp.Body)
+	defer HandleResponseBody(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to get AI summary, status: %s, response: %s", resp.Status, string(body))
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to get AI summary, status: %s, response: %s", resp.Status, string(respBody))
 	}
 
 	var result struct {
@@ -351,34 +348,21 @@ func (p *JiraPlugin) fetchAssignedIssues(userEmail string) ([]struct {
 	Status    string
 	Updated   string
 }, error) {
-	// Properly encode JQL query
 	jql := fmt.Sprintf("assignee='%s' ORDER BY updated DESC", userEmail)
 	encodedJQL := url.QueryEscape(jql)
+	endpoint := fmt.Sprintf("/rest/api/2/search?jql=%s", encodedJQL)
 
-	// Construct request URL
-	jiraSearchUrl := fmt.Sprintf("%s/rest/api/3/search?jql=%s", p.baseURL, encodedJQL)
-
-	req, err := http.NewRequest("GET", jiraSearchUrl, nil)
+	resp, err := p.makeRequest("GET", endpoint, nil, false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %v", err)
+		return nil, wrapError("failed to fetch assigned issues", err)
 	}
-
-	req.SetBasicAuth(p.email, p.apiToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %v", err)
-	}
-	defer resp.Body.Close()
+	defer HandleResponseBody(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("failed to fetch assigned issues, status: %s, response: %s", resp.Status, string(body))
 	}
 
-	// Parse response
 	var result struct {
 		Issues []struct {
 			Key    string `json:"key"`
@@ -399,16 +383,16 @@ func (p *JiraPlugin) fetchAssignedIssues(userEmail string) ([]struct {
 		return nil, fmt.Errorf("failed to parse response: %v", err)
 	}
 
-	// Convert to expected return format
-	var formattedIssues []struct {
+	formattedIssues := make([]struct {
 		Key       string
 		Summary   string
 		IssueType string
 		Status    string
 		Updated   string
-	}
-	for _, issue := range result.Issues {
-		formattedIssues = append(formattedIssues, struct {
+	}, len(result.Issues))
+
+	for i, issue := range result.Issues {
+		formattedIssues[i] = struct {
 			Key       string
 			Summary   string
 			IssueType string
@@ -420,7 +404,7 @@ func (p *JiraPlugin) fetchAssignedIssues(userEmail string) ([]struct {
 			IssueType: issue.Fields.IssueType.Name,
 			Status:    issue.Fields.Status.Name,
 			Updated:   issue.Fields.Updated,
-		})
+		}
 	}
 
 	return formattedIssues, nil
