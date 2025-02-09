@@ -6,7 +6,7 @@ on:
       - 'v*'  # Runs only when a tag like v1.0.0 is pushed
 
 permissions:
-  contents: write  
+  contents: write
 
 jobs:
   release:
@@ -23,7 +23,7 @@ jobs:
 
       - name: Install GoReleaser
         run: |
-          curl -sL https://git.io/goreleaser | bash
+          curl -sL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | bash
 
       - name: Run GoReleaser
         env:
