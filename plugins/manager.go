@@ -26,7 +26,12 @@ func (pm *PluginManager) LoadCorePlugins() {
 		return
 	}
 
-	// Add other built-in plugins (e.g., GitHub)
+	github := &core.GitHubPlugin{}
+	pm.plugins["github"] = github
+	err = github.Init()
+	if err != nil {
+		fmt.Println("Failed to initialize GitHub plugin:", err)
+	}
 }
 
 // LoadExternalPlugin loads a shared object (.so) plugin

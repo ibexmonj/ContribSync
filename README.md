@@ -109,6 +109,35 @@ These contributions enhanced platform reliability and performance, benefiting bo
 ```
 _This requires the OpenAI API key to be set._
 
+### ✅ GitHub Integration
+- **Fetch pull requests** from a repository.
+- **List commits** associated with each PR.
+- **Track merged and closed PRs** for contribution logging.
+
+_Requires a valid GITHUB_TOKEN to be set._
+```sh
+export GITHUB_TOKEN=your-personal-access-token
+```
+
+
+📌 Fetch Pull Requests & Commits from GitHub
+```sh
+./csync plugin exec github summary owner/repo
+
+```
+
+Sample Output:
+```
+
+📌 Pull Request Summary for owner/repo
+
+🔹 PR #42: Fix database connection issue (closed)
+🏷️ Status: closed
+🔄 Merged: true
+📆 Created: 2024-06-15 00:49:33 UTC
+📝 Commits:
+- [abc123] Fix DB connection timeout
+- [def456] Improve error logging
 
 ## 🚀 We’re Adding Features Regularly!
 
@@ -124,10 +153,11 @@ This project is licensed under the [MIT License.](LICENSE)
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute.
 
 ## 🛠️ Future Roadmap
-•	GitHub Integration (track PRs, commits, issues)  
+•	Refactor cli command structure . E.g. "csync plugin exec jira..." to "csync jira..."
 •	Slack & Teams Notifications  
 •	Export Summaries as JSON or Markdown  
 
 ## 🌟 Support & Feedback
 
 Have ideas or feedback? Open an issue or reach out!
+```
