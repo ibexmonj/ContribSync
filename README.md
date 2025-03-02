@@ -138,6 +138,7 @@ Sample Output:
 📝 Commits:
 - [abc123] Fix DB connection timeout
 - [def456] Improve error logging
+```
 
 ## 🚀 We’re Adding Features Regularly!
 
@@ -160,4 +161,3 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines 
 ## 🌟 Support & Feedback
 
 Have ideas or feedback? Open an issue or reach out!
-```
