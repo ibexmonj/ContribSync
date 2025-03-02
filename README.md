@@ -112,7 +112,7 @@ _This requires the OpenAI API key to be set._
 ### ✅ GitHub Integration
 - **Fetch pull requests** from a repository.
 - **List commits** associated with each PR.
-- **Track merged and closed PRs** for contribution logging.
+- **Track  open, merged and closed PRs** for contribution logging.
 
 _Requires a valid GITHUB_TOKEN to be set._
 ```sh
