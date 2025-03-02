@@ -28,7 +28,7 @@ func (g *GitHubPlugin) Info() (string, string) {
 // Execute runs the GitHub plugin with given args
 func (g *GitHubPlugin) Execute(args []string) error {
 	if len(args) < 2 {
-		return fmt.Errorf("Usage: csync plugin exec github summary owner/repo")
+		return fmt.Errorf("Usage: csync plugin exec github summary owner/repo [email]")
 	}
 
 	if args[0] != "summary" {
@@ -38,12 +38,18 @@ func (g *GitHubPlugin) Execute(args []string) error {
 	repoArg := args[1]
 	owner, repo := parseOwnerRepo(repoArg)
 
-	GitHubSummary(owner, repo)
+	var emailFilter string
+
+	if len(args) >= 3 {
+		emailFilter = args[2]
+	}
+
+	GitHubSummary(owner, repo, emailFilter)
 	return nil
 }
 
 // GitHubSummary fetches PRs & commits for a repo
-func GitHubSummary(owner, repo string) {
+func GitHubSummary(owner, repo, emailFilter string) {
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		log.Fatal("GITHUB_TOKEN is not set")
@@ -59,12 +65,14 @@ func GitHubSummary(owner, repo string) {
 		log.Fatalf("Error fetching PRs: %v", err)
 	}
 
-	fmt.Printf("📌 Pull Request Summary for %s/%s\n", owner, repo)
+	if emailFilter != "" {
+		fmt.Printf("📌 Pull Request Summary for %s/%s (Filtered by commits from: %s)\n", owner, repo, emailFilter)
+	} else {
+		fmt.Printf("📌 Pull Request Summary for %s/%s\n", owner, repo)
+	}
+	prCount := 0
+
 	for _, pr := range prs {
-		fmt.Printf("\n🔹 PR #%d: %s (%s)\n", *pr.Number, *pr.Title, *pr.State)
-		fmt.Printf("   🏷️ Status: %s\n", *pr.State)
-		fmt.Printf("   🔄 Merged: %v\n", pr.MergedAt != nil)
-		fmt.Printf("   📆 Created: %v\n", pr.CreatedAt)
 
 		commits, err := fetchCommits(client, ctx, owner, repo, *pr.Number)
 		if err != nil {
@@ -72,11 +80,41 @@ func GitHubSummary(owner, repo string) {
 			continue
 		}
 
+		var matchingCommits []*github.RepositoryCommit
+		if emailFilter != "" {
+			matchingCommits = filterCommitsByEmail(commits, emailFilter)
+			if len(matchingCommits) == 0 {
+				continue
+			}
+		} else {
+			matchingCommits = commits
+		}
+
+		prCount++
+
+		fmt.Printf("\n🔹 PR #%d: %s (%s)\n", *pr.Number, *pr.Title, *pr.State)
+		fmt.Printf("   🏷️ Status: %s\n", *pr.State)
+		fmt.Printf("   🔄 Merged: %v\n", pr.MergedAt != nil)
+		fmt.Printf("   📆 Created: %v\n", pr.CreatedAt)
+
 		fmt.Printf("   📝 Commits:\n")
-		for _, commit := range commits {
+		for _, commit := range matchingCommits {
 			fmt.Printf("      - [%s] %s\n", (*commit.SHA)[:7], *commit.Commit.Message)
 		}
 	}
+	if prCount == 0 && emailFilter != "" {
+		fmt.Printf("\n❌ No pull requests found with commits by %s\n", emailFilter)
+	}
+}
+
+func filterCommitsByEmail(commits []*github.RepositoryCommit, email string) []*github.RepositoryCommit {
+	var filtered []*github.RepositoryCommit
+	for _, commit := range commits {
+		if commit.Commit.Author != nil && commit.Commit.Author.Email != nil && *commit.Commit.Author.Email == email {
+			filtered = append(filtered, commit)
+		}
+	}
+	return filtered
 }
 
 // Fetch PRs for the repository
