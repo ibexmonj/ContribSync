@@ -120,9 +120,9 @@ export GITHUB_TOKEN=your-personal-access-token
 ```
 
 
-📌 Fetch Pull Requests & Commits from GitHub
+📌 Fetch Pull Requests & Commits from GitHub; filter by email
 ```sh
-./csync plugin exec github summary owner/repo
+./csync plugin exec github summary owner/repo email@example.com
 
 ```
 
