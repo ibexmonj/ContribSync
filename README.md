@@ -33,7 +33,7 @@ ContribSync (`csync`) is a CLI tool that helps individual contributors track the
 Clone the repo and navigate into the project directory:
 ```sh
 git clone https://github.com/your-org/ContribSync.git
-cd ContribSync
+cd ContribSync/cmd/csync
 go build -o csync main.go
 ```
 
