@@ -1,22 +1,22 @@
 package main
 
 import (
-	"github.com/ibexmonj/ContribSync/plugins"
+	"github.com/ibexmonj/ContribSync/pkg/logger"
+	"github.com/ibexmonj/ContribSync/pkg/plugins"
 	"github.com/spf13/cobra"
 	"os"
 
 	"github.com/ibexmonj/ContribSync/commands"
-	"github.com/ibexmonj/ContribSync/utils"
 )
 
 func main() {
 	// Initialize logger
-	if err := utils.InitLogger("info"); err != nil {
-		utils.Logger.Fatal().Err(err).Msg("Failed to initialize logger")
+	if err := logger.InitLogger("info"); err != nil {
+		logger.Logger.Fatal().Err(err).Msg("Failed to initialize logger")
 		os.Exit(1)
 	}
 
-	utils.Logger.Info().Msg("Starting csync application")
+	logger.Logger.Info().Msg("Starting csync application")
 
 	// Root command
 	var rootCmd = &cobra.Command{
@@ -40,7 +40,7 @@ func main() {
 
 	// Execute the root command
 	if err := rootCmd.Execute(); err != nil {
-		utils.Logger.Fatal().Err(err).Msg("Failed to execute command")
+		logger.Logger.Fatal().Err(err).Msg("Failed to execute command")
 		os.Exit(1)
 	}
 }

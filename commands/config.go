@@ -3,7 +3,7 @@ package commands
 import (
 	"fmt"
 	"github.com/ibexmonj/ContribSync/config"
-	"github.com/ibexmonj/ContribSync/utils"
+	"github.com/ibexmonj/ContribSync/pkg/logger"
 	"github.com/spf13/cobra"
 	"regexp"
 )
@@ -22,19 +22,19 @@ func SetConfig(cfg *config.Config, key, value string) error {
 	case "reminder.time":
 		// Validate time format
 		if err := validateTimeFormat(value); err != nil {
-			utils.Logger.Warn().Str("key", key).Str("value", value).Msg("Invalid time format")
+			logger.Logger.Warn().Str("key", key).Str("value", value).Msg("Invalid time format")
 			return err
 		}
 		cfg.Reminder.Time = value
-		utils.Logger.Info().Str("key", key).Str("value", value).Msg("Updated configuration")
+		logger.Logger.Info().Str("key", key).Str("value", value).Msg("Updated configuration")
 	case "reminder.title":
 		// Ensure title is not empty
 		if value == "" {
-			utils.Logger.Warn().Str("key", key).Msg("Empty title value")
+			logger.Logger.Warn().Str("key", key).Msg("Empty title value")
 			return fmt.Errorf("reminder title cannot be empty")
 		}
 		cfg.Reminder.Title = value
-		utils.Logger.Info().Str("key", key).Str("value", value).Msg("Updated configuration")
+		logger.Logger.Info().Str("key", key).Str("value", value).Msg("Updated configuration")
 	case "reminder.message":
 		// Ensure message is not empty
 		if value == "" {
@@ -48,7 +48,7 @@ func SetConfig(cfg *config.Config, key, value string) error {
 	case "plugins.github.api_token":
 		cfg.Plugins.GitHub.APIToken = value
 	default:
-		utils.Logger.Warn().Str("key", key).Msg("Unknown configuration key")
+		logger.Logger.Warn().Str("key", key).Msg("Unknown configuration key")
 		return fmt.Errorf("unknown configuration key: %s", key)
 	}
 
@@ -77,7 +77,7 @@ func NewConfigCommand() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg, err := config.LoadConfig()
 			if err != nil {
-				utils.Logger.Error().Err(err).Msg("Failed to load configuration")
+				logger.Logger.Error().Err(err).Msg("Failed to load configuration")
 				fmt.Printf("Error loading config: %v\n", err)
 				return
 			}
@@ -92,7 +92,7 @@ func NewConfigCommand() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg, err := config.LoadConfig()
 			if err != nil {
-				utils.Logger.Error().Err(err).Msg("Failed to load configuration")
+				logger.Logger.Error().Err(err).Msg("Failed to load configuration")
 				fmt.Printf("Error loading config: %v\n", err)
 				return
 			}
@@ -100,12 +100,12 @@ func NewConfigCommand() *cobra.Command {
 			key := args[0]
 			value := args[1]
 			if err := SetConfig(cfg, key, value); err != nil {
-				utils.Logger.Error().Err(err).Str("key", key).Str("value", value).Msg("Failed to set configuration")
+				logger.Logger.Error().Err(err).Str("key", key).Str("value", value).Msg("Failed to set configuration")
 				fmt.Printf("Error: %v\n", err)
 				return
 			}
 
-			utils.Logger.Info().Str("key", key).Str("value", value).Msg("Configuration updated successfully")
+			logger.Logger.Info().Str("key", key).Str("value", value).Msg("Configuration updated successfully")
 			fmt.Println("Configuration updated successfully.")
 		},
 	})

@@ -3,7 +3,7 @@ package plugins
 import (
 	"errors"
 	"fmt"
-	"github.com/ibexmonj/ContribSync/plugins/core"
+	"github.com/ibexmonj/ContribSync/pkg/jira"
 	"plugin"
 )
 
@@ -19,14 +19,14 @@ func NewPluginManager() *PluginManager {
 
 // LoadCorePlugins loads built-in plugins
 func (pm *PluginManager) LoadCorePlugins() {
-	jira := &core.JiraPlugin{}
+	jira := &jira.JiraPlugin{}
 	pm.plugins["jira"] = jira
 	err := jira.Init()
 	if err != nil {
 		return
 	}
 
-	github := &core.GitHubPlugin{}
+	github := &GitHubPlugin{}
 	pm.plugins["github"] = github
 	err = github.Init()
 	if err != nil {

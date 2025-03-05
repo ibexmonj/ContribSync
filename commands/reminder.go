@@ -3,7 +3,7 @@ package commands
 import (
 	"fmt"
 	"github.com/gen2brain/beeep"
-	"github.com/ibexmonj/ContribSync/utils"
+	"github.com/ibexmonj/ContribSync/pkg/logger"
 	"github.com/spf13/cobra"
 	"os/exec"
 	"time"
@@ -85,7 +85,7 @@ func NewReminderCommand() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg, err := config.LoadConfig()
 			if err != nil {
-				utils.Logger.Error().Err(err).Msg("Failed to load configuration")
+				logger.Logger.Error().Err(err).Msg("Failed to load configuration")
 				fmt.Printf("Error loading config: %v\n", err)
 				return
 			}
@@ -99,7 +99,7 @@ func NewReminderCommand() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg, err := config.LoadConfig()
 			if err != nil {
-				utils.Logger.Error().Err(err).Msg("Failed to load configuration")
+				logger.Logger.Error().Err(err).Msg("Failed to load configuration")
 				fmt.Printf("Error loading config: %v\n", err)
 				return
 			}

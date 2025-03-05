@@ -2,8 +2,7 @@ package commands
 
 import (
 	"fmt"
-	"github.com/ibexmonj/ContribSync/plugins"
-
+	"github.com/ibexmonj/ContribSync/pkg/plugins"
 	"github.com/spf13/cobra"
 )
 
