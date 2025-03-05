@@ -2,8 +2,8 @@ package plugins
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
@@ -11,24 +11,20 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// GitHubPlugin implements the Plugin interface
 type GitHubPlugin struct{}
 
-// Init initializes the GitHub plugin
 func (g *GitHubPlugin) Init() error {
 	fmt.Println("✅ GitHub plugin initialized")
 	return nil
 }
 
-// Info returns plugin metadata
 func (g *GitHubPlugin) Info() (string, string) {
 	return "github", "GitHub Plugin: Fetch PRs and commits"
 }
 
-// Execute runs the GitHub plugin with given args
 func (g *GitHubPlugin) Execute(args []string) error {
 	if len(args) < 2 {
-		return fmt.Errorf("Usage: csync plugin exec github summary owner/repo [email]")
+		return errors.New("Usage: csync plugin exec github summary owner/repo [email]")
 	}
 
 	if args[0] != "summary" {
@@ -36,7 +32,10 @@ func (g *GitHubPlugin) Execute(args []string) error {
 	}
 
 	repoArg := args[1]
-	owner, repo := parseOwnerRepo(repoArg)
+	owner, repo, err := parseOwnerRepo(repoArg)
+	if err != nil {
+		return err
+	}
 
 	var emailFilter string
 
@@ -44,15 +43,14 @@ func (g *GitHubPlugin) Execute(args []string) error {
 		emailFilter = args[2]
 	}
 
-	GitHubSummary(owner, repo, emailFilter)
-	return nil
+	return GitHubSummary(owner, repo, emailFilter)
 }
 
 // GitHubSummary fetches PRs & commits for a repo
-func GitHubSummary(owner, repo, emailFilter string) {
+func GitHubSummary(owner, repo, emailFilter string) error {
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
-		log.Fatal("GITHUB_TOKEN is not set")
+		return errors.New("GITHUB_TOKEN is not set")
 	}
 
 	ctx := context.Background()
@@ -62,7 +60,7 @@ func GitHubSummary(owner, repo, emailFilter string) {
 
 	prs, err := fetchPRs(client, ctx, owner, repo)
 	if err != nil {
-		log.Fatalf("Error fetching PRs: %v", err)
+		return fmt.Errorf("failed to fetch PRs: %w", err)
 	}
 
 	if emailFilter != "" {
@@ -105,6 +103,7 @@ func GitHubSummary(owner, repo, emailFilter string) {
 	if prCount == 0 && emailFilter != "" {
 		fmt.Printf("\n❌ No pull requests found with commits by %s\n", emailFilter)
 	}
+	return nil
 }
 
 func filterCommitsByEmail(commits []*github.RepositoryCommit, email string) []*github.RepositoryCommit {
@@ -121,20 +120,26 @@ func filterCommitsByEmail(commits []*github.RepositoryCommit, email string) []*g
 func fetchPRs(client *github.Client, ctx context.Context, owner, repo string) ([]*github.PullRequest, error) {
 	opts := &github.PullRequestListOptions{State: "all", ListOptions: github.ListOptions{PerPage: 10}}
 	prs, _, err := client.PullRequests.List(ctx, owner, repo, opts)
-	return prs, err
+	if err != nil {
+		return nil, fmt.Errorf("error fetching PRs from GitHub: %w", err)
+	}
+	return prs, nil
 }
 
 // Fetch commits for a specific PR
 func fetchCommits(client *github.Client, ctx context.Context, owner, repo string, prNumber int) ([]*github.RepositoryCommit, error) {
 	commits, _, err := client.PullRequests.ListCommits(ctx, owner, repo, prNumber, nil)
-	return commits, err
+	if err != nil {
+		return nil, fmt.Errorf("error fetching commits for PR #%d: %w", prNumber, err)
+	}
+	return commits, nil
 }
 
 // Parse "owner/repo" format
-func parseOwnerRepo(full string) (string, string) {
+func parseOwnerRepo(full string) (string, string, error) {
 	parts := strings.Split(full, "/")
 	if len(parts) != 2 {
-		log.Fatal("Invalid repo format, expected owner/repo")
+		return "", "", errors.New("invalid repo format, expected owner/repo")
 	}
-	return parts[0], parts[1]
+	return parts[0], parts[1], nil
 }
