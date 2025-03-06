@@ -17,20 +17,16 @@ func main() {
 
 	logger.Logger.Info().Msg("Starting csync... ")
 
-	// Root command
 	var rootCmd = &cobra.Command{
 		Use:   "csync",
 		Short: "Csync - Contribution Sync CLI",
 		Long:  "Csync helps manage and log your contributions across various platforms.",
 	}
 
-	// Add subcommands
 	rootCmd.AddCommand(commands.NewConfigCommand())
 	rootCmd.AddCommand(commands.NewReminderCommand())
-	//	rootCmd.AddCommand(commands.NewHelpCommand())
 	rootCmd.AddCommand(commands.NewCompletionCommand())
 
-	// Initialize the PluginManager
 	pluginManager := plugins.NewPluginManager()
 	pluginManager.LoadCorePlugins()
 

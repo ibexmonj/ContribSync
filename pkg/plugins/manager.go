@@ -1,79 +1,81 @@
 package plugins
 
 import (
-	"errors"
 	"fmt"
-	"github.com/ibexmonj/ContribSync/pkg/jira"
+	"github.com/ibexmonj/ContribSync/pkg/logger"
 	"plugin"
 )
 
 type PluginManager struct {
-	plugins map[string]Plugin // Loaded plugins by name
+	Plugins map[string]Plugin
 }
 
 func NewPluginManager() *PluginManager {
 	return &PluginManager{
-		plugins: make(map[string]Plugin),
+		Plugins: make(map[string]Plugin),
 	}
 }
 
-// LoadCorePlugins loads built-in plugins
+func (pm *PluginManager) RegisterPlugin(plugin Plugin) {
+	name, desc := plugin.Info()
+	pm.Plugins[name] = plugin
+	logger.Logger.Info().
+		Str("plugin", name).
+		Msgf("✅ Loaded plugin: %s - %s", name, desc)
+}
+
+// LoadCorePlugins initializes built-in plugins
 func (pm *PluginManager) LoadCorePlugins() {
-	jira := &jira.JiraPlugin{}
-	pm.plugins["jira"] = jira
-	err := jira.Init()
-	if err != nil {
-		return
-	}
+	logger.Logger.Info().Msg("🔍 Loading core plugins...")
 
-	github := &GitHubPlugin{}
-	pm.plugins["github"] = github
-	err = github.Init()
-	if err != nil {
-		fmt.Println("Failed to initialize GitHub plugin:", err)
-	}
+	pm.RegisterPlugin(&GitHubPlugin{})
+	pm.RegisterPlugin(&JiraPlugin{})
+
+	logger.Logger.Info().
+		Int("plugin_count", len(pm.Plugins)).
+		Msg("✅ Core plugins loaded successfully")
 }
 
-// LoadExternalPlugin loads a shared object (.so) plugin
 func (pm *PluginManager) LoadExternalPlugin(path string) error {
+	logger.Logger.Info().Str("plugin_path", path).Msg("🔗 Loading external plugin")
+
 	p, err := plugin.Open(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open plugin %s: %w", path, err)
 	}
 
-	symbol, err := p.Lookup("PluginInstance")
+	sym, err := p.Lookup("PluginInstance")
 	if err != nil {
-		return errors.New("plugin must export a 'PluginInstance'")
+		return fmt.Errorf("failed to find PluginInstance in %s: %w", path, err)
 	}
 
-	instance, ok := symbol.(Plugin)
+	pluginInstance, ok := sym.(Plugin)
 	if !ok {
-		return errors.New("invalid plugin type")
+		return fmt.Errorf("invalid plugin format in %s", path)
 	}
 
-	err = instance.Init()
-	if err != nil {
-		return err
-	}
-	name, _ := instance.Info()
-	pm.plugins[name] = instance
-	fmt.Printf("Loaded external plugin: %s\n", name)
+	name, desc := pluginInstance.Info()
+	pm.Plugins[name] = pluginInstance
+
+	logger.Logger.Info().Str("plugin", name).Msgf("✅ Loaded external plugin: %s - %s", name, desc)
 	return nil
 }
 
-// ExecutePlugin executes a plugin by name
 func (pm *PluginManager) ExecutePlugin(name string, args []string) error {
-	p, exists := pm.plugins[name]
+	plugin, exists := pm.Plugins[name]
 	if !exists {
+		logger.Logger.Error().Str("plugin", name).Msg("❌ Plugin not found")
 		return fmt.Errorf("plugin not found: %s", name)
 	}
-	return p.Execute(args)
+
+	logger.Logger.Info().Str("plugin", name).Msg("🚀 Executing plugin")
+	return plugin.Execute(args)
 }
 
-// ListPlugins lists all loaded plugins
 func (pm *PluginManager) ListPlugins() {
-	for name, p := range pm.plugins {
+	fmt.Println("\n🔌 Loaded Plugins:")
+	for name, p := range pm.Plugins {
 		_, desc := p.Info()
-		fmt.Printf("Plugin: %s - %s\n", name, desc)
+		fmt.Printf("   ✅ %s - %s\n", name, desc)
 	}
 }
