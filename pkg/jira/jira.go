@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/ibexmonj/ContribSync/pkg/logger"
 	"io"
 	"net/http"
 	"net/url"
@@ -45,11 +46,11 @@ func wrapError(msg string, err error) error {
 }
 
 func (p *JiraPlugin) Init() error {
-	fmt.Println("Initializing Jira plugin...")
+	logger.Logger.Info().Msg("Initializing Jira plugin...")
 	if err := p.LoadEnvVars(); err != nil {
 		return err
 	}
-	fmt.Println("Jira plugin initialized with base URL:", p.baseURL)
+	logger.Logger.Info().Str("Base URL", p.baseURL).Msg("Jira plugin initialized")
 	return nil
 }
 
@@ -166,8 +167,7 @@ func (j *JiraPlugin) CreateIssue(projectKey, summary, description string) error 
 
 	defer HandleResponseBody(resp.Body)
 	respBody, _ := io.ReadAll(resp.Body)
-	fmt.Println("Jira Response:", string(respBody))
-
+	logger.Logger.Debug().Str("JiraResponse", string(respBody)).Msg("Jira API response")
 	if resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("unexpected response from Jira: %s", resp.Status)
 	}
@@ -202,10 +202,14 @@ func (p *JiraPlugin) listIssues(projectKey string) error {
 		return fmt.Errorf("failed to parse response: %v", err)
 	}
 
-	fmt.Printf("Issues for project %s:\n", projectKey)
+	fmt.Printf("\n📌 Issues for project **%s**:\n", projectKey)
 	for _, issue := range result.Issues {
-		fmt.Printf("- %s: %s\n", issue.Key, issue.Fields.Summary)
+		fmt.Printf("   - [%s] %s\n", issue.Key, issue.Fields.Summary)
 	}
+	logger.Logger.Info().
+		Str("Project", projectKey).
+		Int("Issue Count", len(result.Issues)).
+		Msg("Fetched Jira issues")
 
 	return nil
 }
@@ -249,14 +253,15 @@ func (p *JiraPlugin) assignedIssues(userEmail string) error {
 	}
 
 	if len(result.Issues) == 0 {
-		fmt.Printf("📌 No issues assigned to %s.\n", userEmail)
+		fmt.Printf("\n📌 No issues assigned to **%s**.\n", userEmail)
 		return nil
 	}
 
-	fmt.Printf("📌 Issues assigned to %s:\n", userEmail)
+	fmt.Printf("\n📌 Issues assigned to **%s**:\n", userEmail)
+
 	for _, issue := range result.Issues {
-		fmt.Printf("- %s [%s]: %s (Status: %s, Updated: %s)\n",
-			issue.Key, issue.Fields.IssueType.Name, issue.Fields.Summary, issue.Fields.Status.Name, issue.Fields.Updated)
+		fmt.Printf("   - [%s] (%s) %s\n", issue.Key, issue.Fields.IssueType.Name, issue.Fields.Summary)
+		fmt.Printf("     🔹 Status: %s | 📅 Updated: %s\n", issue.Fields.Status.Name, issue.Fields.Updated)
 	}
 
 	return nil

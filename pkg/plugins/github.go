@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ibexmonj/ContribSync/pkg/logger"
 	"os"
 	"strings"
 
@@ -14,7 +15,7 @@ import (
 type GitHubPlugin struct{}
 
 func (g *GitHubPlugin) Init() error {
-	fmt.Println("✅ GitHub plugin initialized")
+	logger.Logger.Info().Msg("✅ GitHub plugin initialized")
 	return nil
 }
 
@@ -50,7 +51,7 @@ func (g *GitHubPlugin) Execute(args []string) error {
 func GitHubSummary(owner, repo, emailFilter string) error {
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
-		return errors.New("GITHUB_TOKEN is not set")
+		return errors.New("❌ GITHUB_TOKEN is not set")
 	}
 
 	ctx := context.Background()
@@ -60,13 +61,19 @@ func GitHubSummary(owner, repo, emailFilter string) error {
 
 	prs, err := fetchPRs(client, ctx, owner, repo)
 	if err != nil {
-		return fmt.Errorf("failed to fetch PRs: %w", err)
+		return fmt.Errorf("❌ Failed to fetch PRs: %w", err)
 	}
 
 	if emailFilter != "" {
-		fmt.Printf("📌 Pull Request Summary for %s/%s (Filtered by commits from: %s)\n", owner, repo, emailFilter)
+		logger.Logger.Info().
+			Str("owner", owner).
+			Str("repo", repo).
+			Msg("📌 Pull Request Summary")
 	} else {
-		fmt.Printf("📌 Pull Request Summary for %s/%s\n", owner, repo)
+		logger.Logger.Info().
+			Str("owner", owner).
+			Str("repo", repo).
+			Msg("📌 Pull Request Summary")
 	}
 	prCount := 0
 
@@ -74,7 +81,7 @@ func GitHubSummary(owner, repo, emailFilter string) error {
 
 		commits, err := fetchCommits(client, ctx, owner, repo, *pr.Number)
 		if err != nil {
-			fmt.Printf("   ⚠️ Error fetching commits: %v\n", err)
+			fmt.Printf("   ⚠️ Failed to fetch commits for PR #%d: %v\n", *pr.Number, err)
 			continue
 		}
 
@@ -90,18 +97,21 @@ func GitHubSummary(owner, repo, emailFilter string) error {
 
 		prCount++
 
-		fmt.Printf("\n🔹 PR #%d: %s (%s)\n", *pr.Number, *pr.Title, *pr.State)
-		fmt.Printf("   🏷️ Status: %s\n", *pr.State)
-		fmt.Printf("   🔄 Merged: %v\n", pr.MergedAt != nil)
-		fmt.Printf("   📆 Created: %v\n", pr.CreatedAt)
+		fmt.Printf("\n🔹 **PR #%d**: %s (%s)\n", *pr.Number, *pr.Title, *pr.State)
+		fmt.Printf("   🏷️ Status: %s | 🔄 Merged: %v | 📆 Created: %v\n", *pr.State, pr.MergedAt != nil, pr.CreatedAt)
 
-		fmt.Printf("   📝 Commits:\n")
-		for _, commit := range matchingCommits {
-			fmt.Printf("      - [%s] %s\n", (*commit.SHA)[:7], *commit.Commit.Message)
+		if len(matchingCommits) > 0 {
+			fmt.Println("   📝 Commits:")
+			for _, commit := range matchingCommits {
+				fmt.Printf("      - [%s] %s\n", (*commit.SHA)[:7], *commit.Commit.Message)
+			}
+		} else {
+			fmt.Println("   🚫 No matching commits found.")
 		}
 	}
-	if prCount == 0 && emailFilter != "" {
-		fmt.Printf("\n❌ No pull requests found with commits by %s\n", emailFilter)
+
+	if prCount == 0 {
+		fmt.Println("\n❌ No pull requests found.")
 	}
 	return nil
 }

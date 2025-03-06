@@ -1,7 +1,7 @@
 package commands
 
 import (
-	"fmt"
+	"github.com/ibexmonj/ContribSync/pkg/logger"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -28,7 +28,7 @@ Examples:
 			case "powershell":
 				cmd.Root().GenPowerShellCompletionWithDesc(os.Stdout)
 			default:
-				fmt.Println("Unsupported shell. Please use bash, zsh, fish, or powershell.")
+				logger.Logger.Warn().Msg("Unsupported shell. Please use bash, zsh, fish, or powershell.")
 			}
 		},
 	}

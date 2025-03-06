@@ -9,10 +9,10 @@ import (
 )
 
 func ShowConfig(cfg *config.Config) {
-	fmt.Println("Loaded Configuration:")
-	fmt.Printf("Reminder Time: %s\n", cfg.Reminder.Time)
-	fmt.Printf("Reminder Title: %s\n", cfg.Reminder.Title)
-	fmt.Printf("Reminder Message: %s\n", cfg.Reminder.Message)
+	logger.Logger.Info().Msg("Loaded Configuration")
+	logger.Logger.Info().Str("Reminder Time", cfg.Reminder.Time).Msg("")
+	logger.Logger.Info().Str("Reminder Title: %s\n", cfg.Reminder.Title)
+	logger.Logger.Info().Str("Reminder Message", cfg.Reminder.Message).Msg("")
 	fmt.Printf("Jira Enabled: %t, Base URL: %s\n", cfg.Plugins.Jira.Enabled, cfg.Plugins.Jira.BaseURL)
 	fmt.Printf("GitHub Enabled: %t, API Token: %s\n", cfg.Plugins.GitHub.Enabled, cfg.Plugins.GitHub.APIToken)
 }
@@ -93,7 +93,6 @@ func NewConfigCommand() *cobra.Command {
 			cfg, err := config.LoadConfig()
 			if err != nil {
 				logger.Logger.Error().Err(err).Msg("Failed to load configuration")
-				fmt.Printf("Error loading config: %v\n", err)
 				return
 			}
 

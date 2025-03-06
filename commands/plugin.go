@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"github.com/ibexmonj/ContribSync/pkg/logger"
 	"github.com/ibexmonj/ContribSync/pkg/plugins"
 	"github.com/spf13/cobra"
 )
@@ -27,7 +28,7 @@ func NewPluginCommand(pm *plugins.PluginManager) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			path := args[0]
 			if err := pm.LoadExternalPlugin(path); err != nil {
-				fmt.Printf("Failed to load plugin: %v\n", err)
+				logger.Logger.Error().Err(err).Msg("Failed to execute plugin")
 			}
 		},
 	})

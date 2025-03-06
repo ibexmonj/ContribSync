@@ -17,26 +17,18 @@ func SendDesktopNotification(title, message string) error {
 }
 
 func StartReminder(cfg *config.Config) {
-	fmt.Println("Reminder is running. Press Ctrl+C to stop.")
-
+	logger.Logger.Info().Msg("Reminder is running. Press Ctrl+C to stop.")
 	for {
 		now := time.Now()
 		currentTime := now.Format("15:04") // Format time as HH:MM
 
 		if currentTime == cfg.Reminder.Time {
-			// Print to terminal
 			fmt.Printf("Reminder: It's %s %s!", cfg.Reminder.Time, cfg.Reminder.Message)
 
-			// Send desktop notification
 			err := SendDesktopNotification(cfg.Reminder.Title, cfg.Reminder.Message)
-			if err != nil {
-				fmt.Printf("Failed to send notification: %v\n", err)
-			}
-
-			// Avoid duplicate reminders in the same minute
+			fmt.Printf("Failed to send notification: %v\n", err)
 			time.Sleep(60 * time.Second)
 		} else {
-			// Check every 10 seconds
 			time.Sleep(10 * time.Second)
 		}
 	}
@@ -100,7 +92,6 @@ func NewReminderCommand() *cobra.Command {
 			cfg, err := config.LoadConfig()
 			if err != nil {
 				logger.Logger.Error().Err(err).Msg("Failed to load configuration")
-				fmt.Printf("Error loading config: %v\n", err)
 				return
 			}
 			TestReminder(cfg)
