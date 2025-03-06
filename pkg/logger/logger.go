@@ -2,28 +2,26 @@ package logger
 
 import (
 	"os"
-	"time"
+	"strings"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 var Logger zerolog.Logger
 
-// InitLogger initializes a structured logger for stdout
-func InitLogger(logLevel string) error {
-	// Configure Zerolog to write logs in JSON format to stdout
-	zerolog.TimeFieldFormat = time.RFC3339
-	Logger = zerolog.New(os.Stdout).With().
-		Timestamp().
-		Str("service", "csync").
-		Logger()
+func InitLogger(defaultLevel string) error {
+	levelStr := os.Getenv("LOG_LEVEL")
+	if levelStr == "" {
+		levelStr = defaultLevel
+	}
 
-	// Set log level based on the provided configuration
-	level, err := zerolog.ParseLevel(logLevel)
+	level, err := zerolog.ParseLevel(strings.ToLower(levelStr))
 	if err != nil {
 		return err
 	}
-	zerolog.SetGlobalLevel(level)
+
+	Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout}).Level(level)
 
 	return nil
 }

@@ -10,13 +10,12 @@ import (
 )
 
 func main() {
-	// Initialize logger
 	if err := logger.InitLogger("info"); err != nil {
-		logger.Logger.Fatal().Err(err).Msg("Failed to initialize logger")
+		logger.Logger.Error().Err(err).Msg("Failed to initialize logger")
 		os.Exit(1)
 	}
 
-	logger.Logger.Info().Msg("Starting csync application")
+	logger.Logger.Info().Msg("Starting csync... ")
 
 	// Root command
 	var rootCmd = &cobra.Command{
@@ -35,12 +34,10 @@ func main() {
 	pluginManager := plugins.NewPluginManager()
 	pluginManager.LoadCorePlugins()
 
-	// Add plugin commands
 	rootCmd.AddCommand(commands.NewPluginCommand(pluginManager))
 
-	// Execute the root command
 	if err := rootCmd.Execute(); err != nil {
-		logger.Logger.Fatal().Err(err).Msg("Failed to execute command")
+		logger.Logger.Error().Err(err).Msg("Failed to execute command")
 		os.Exit(1)
 	}
 }
