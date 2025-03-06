@@ -30,6 +30,7 @@ func (pm *PluginManager) LoadCorePlugins() {
 
 	pm.RegisterPlugin(&GitHubPlugin{})
 	pm.RegisterPlugin(&JiraPlugin{})
+	pm.RegisterPlugin(&SlackPlugin{})
 
 	logger.Logger.Info().
 		Int("plugin_count", len(pm.Plugins)).
