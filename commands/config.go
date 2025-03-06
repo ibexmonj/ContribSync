@@ -10,34 +10,34 @@ import (
 
 func ShowConfig(cfg *config.Config) {
 	logger.Logger.Info().Msg("Loaded Configuration")
-	logger.Logger.Info().Str("Reminder Time", cfg.Reminder.Time).Msg("")
-	logger.Logger.Info().Str("Reminder Title: %s\n", cfg.Reminder.Title)
-	logger.Logger.Info().Str("Reminder Message", cfg.Reminder.Message).Msg("")
-	fmt.Printf("Jira Enabled: %t, Base URL: %s\n", cfg.Plugins.Jira.Enabled, cfg.Plugins.Jira.BaseURL)
-	fmt.Printf("GitHub Enabled: %t, API Token: %s\n", cfg.Plugins.GitHub.Enabled, cfg.Plugins.GitHub.APIToken)
+
+	fmt.Printf("\n📌 Reminder Settings:\n")
+	fmt.Printf("   ⏰ Time: %s\n", cfg.Reminder.Time)
+	fmt.Printf("   📝 Title: %s\n", cfg.Reminder.Title)
+	fmt.Printf("   💬 Message: %s\n", cfg.Reminder.Message)
+
+	fmt.Printf("\n🔧 Plugin Settings:\n")
+	fmt.Printf("   🏷️ Jira: Enabled: %t, Base URL: %s\n", cfg.Plugins.Jira.Enabled, cfg.Plugins.Jira.BaseURL)
+	fmt.Printf("   🏷️ GitHub: Enabled: %t, API Token: %s\n", cfg.Plugins.GitHub.Enabled, maskToken(cfg.Plugins.GitHub.APIToken))
 }
 
 func SetConfig(cfg *config.Config, key, value string) error {
 	switch key {
 	case "reminder.time":
-		// Validate time format
 		if err := validateTimeFormat(value); err != nil {
 			logger.Logger.Warn().Str("key", key).Str("value", value).Msg("Invalid time format")
 			return err
 		}
 		cfg.Reminder.Time = value
-		logger.Logger.Info().Str("key", key).Str("value", value).Msg("Updated configuration")
 	case "reminder.title":
-		// Ensure title is not empty
 		if value == "" {
 			logger.Logger.Warn().Str("key", key).Msg("Empty title value")
 			return fmt.Errorf("reminder title cannot be empty")
 		}
 		cfg.Reminder.Title = value
-		logger.Logger.Info().Str("key", key).Str("value", value).Msg("Updated configuration")
 	case "reminder.message":
-		// Ensure message is not empty
 		if value == "" {
+			logger.Logger.Warn().Str("key", key).Msg("Empty message value")
 			return fmt.Errorf("reminder message cannot be empty")
 		}
 		cfg.Reminder.Message = value
@@ -52,11 +52,15 @@ func SetConfig(cfg *config.Config, key, value string) error {
 		return fmt.Errorf("unknown configuration key: %s", key)
 	}
 
-	// Use the imported package explicitly for SaveConfig
-	return config.SaveConfig(cfg)
+	if err := config.SaveConfig(); err != nil {
+		logger.Logger.Error().Err(err).Msg("Failed to save configuration")
+		return err
+	}
+
+	logger.Logger.Info().Str("key", key).Str("value", value).Msg("Configuration updated successfully")
+	return nil
 }
 
-// validateTimeFormat checks if the provided time string matches the HH:MM format
 func validateTimeFormat(timeStr string) error {
 	timeFormat := regexp.MustCompile(`^(?:[01]\d|2[0-3]):[0-5]\d$`) // Matches 00:00 to 23:59
 	if !timeFormat.MatchString(timeStr) {
@@ -64,6 +68,14 @@ func validateTimeFormat(timeStr string) error {
 	}
 	return nil
 }
+
+func maskToken(token string) string {
+	if len(token) > 6 {
+		return token[:3] + "..." + token[len(token)-3:] // Masking in format "abc...xyz"
+	}
+	return "******"
+}
+
 func NewConfigCommand() *cobra.Command {
 	var configCmd = &cobra.Command{
 		Use:   "config",
@@ -75,13 +87,12 @@ func NewConfigCommand() *cobra.Command {
 		Use:   "show",
 		Short: "Show current configuration",
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg, err := config.LoadConfig()
-			if err != nil {
+			if err := config.LoadConfig(); err != nil {
 				logger.Logger.Error().Err(err).Msg("Failed to load configuration")
-				fmt.Printf("Error loading config: %v\n", err)
+				fmt.Printf("❌ Error loading config: %v\n", err)
 				return
 			}
-			ShowConfig(cfg)
+			ShowConfig(&config.ConfigData)
 		},
 	})
 
@@ -90,22 +101,22 @@ func NewConfigCommand() *cobra.Command {
 		Short: "Set a configuration value",
 		Args:  cobra.ExactArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg, err := config.LoadConfig()
-			if err != nil {
+			if err := config.LoadConfig(); err != nil {
 				logger.Logger.Error().Err(err).Msg("Failed to load configuration")
+				fmt.Printf("❌ Error loading config: %v\n", err)
 				return
 			}
 
 			key := args[0]
 			value := args[1]
-			if err := SetConfig(cfg, key, value); err != nil {
+
+			if err := SetConfig(&config.ConfigData, key, value); err != nil {
 				logger.Logger.Error().Err(err).Str("key", key).Str("value", value).Msg("Failed to set configuration")
-				fmt.Printf("Error: %v\n", err)
+				fmt.Printf("❌ Error: %v\n", err)
 				return
 			}
 
-			logger.Logger.Info().Str("key", key).Str("value", value).Msg("Configuration updated successfully")
-			fmt.Println("Configuration updated successfully.")
+			fmt.Println("✅ Configuration updated successfully.")
 		},
 	})
 

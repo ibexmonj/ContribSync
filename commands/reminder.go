@@ -6,61 +6,88 @@ import (
 	"github.com/ibexmonj/ContribSync/pkg/logger"
 	"github.com/spf13/cobra"
 	"os/exec"
+	"runtime"
 	"time"
 
 	"github.com/ibexmonj/ContribSync/config"
 )
 
-// SendDesktopNotification sends a cross-platform desktop notification
 func SendDesktopNotification(title, message string) error {
-	return beeep.Notify(title, message, "") //  icon path can be empty
+	logger.Logger.Info().Str("title", title).Str("message", message).Msg("Attempting to send notification")
+
+	err := beeep.Notify(title, message, "")
+	if err != nil {
+		logger.Logger.Error().Err(err).Msg("❌ Failed to send desktop notification using beeep")
+
+		if runtime.GOOS == "darwin" {
+			logger.Logger.Warn().Msg("Using macOS fallback notification")
+			err = SendMacNotification(title, message)
+			if err != nil {
+				logger.Logger.Error().Err(err).Msg("❌ Failed to send macOS notification")
+			}
+		}
+	}
+
+	return err
 }
 
-func StartReminder(cfg *config.Config) {
-	logger.Logger.Info().Msg("Reminder is running. Press Ctrl+C to stop.")
+func StartReminder() {
+	logger.Logger.Info().Msg("⏰ Reminder service started. Press Ctrl+C to stop.")
+
 	for {
 		now := time.Now()
 		currentTime := now.Format("15:04") // Format time as HH:MM
 
-		if currentTime == cfg.Reminder.Time {
-			fmt.Printf("Reminder: It's %s %s!", cfg.Reminder.Time, cfg.Reminder.Message)
+		if currentTime == config.ConfigData.Reminder.Time {
+			logger.Logger.Info().
+				Str("Time", config.ConfigData.Reminder.Time).
+				Str("Message", config.ConfigData.Reminder.Message).
+				Msg("Triggering reminder")
 
-			err := SendDesktopNotification(cfg.Reminder.Title, cfg.Reminder.Message)
-			fmt.Printf("Failed to send notification: %v\n", err)
-			time.Sleep(60 * time.Second)
+			fmt.Printf("\n📢 Reminder: It's %s - %s\n", config.ConfigData.Reminder.Time, config.ConfigData.Reminder.Message)
+
+			err := SendDesktopNotification(config.ConfigData.Reminder.Title, config.ConfigData.Reminder.Message)
+			if err != nil {
+				logger.Logger.Error().Err(err).Msg("Failed to send notification")
+				fmt.Printf("❌ Failed to send notification: %v\n", err)
+			}
+
+			time.Sleep(60 * time.Second) // Wait to avoid sending notifications every second
 		} else {
-			time.Sleep(10 * time.Second)
+			time.Sleep(10 * time.Second) // Check every 10 seconds
 		}
 	}
 }
 
-func ReminderCommand(cfg *config.Config, args []string) {
+func ReminderCommand(args []string) {
 	if len(args) > 0 && args[0] == "test" {
-		TestReminder(cfg)
+		TestReminder()
 		return
 	}
 
-	fmt.Println("Starting the reminder service...")
-	StartReminder(cfg)
+	fmt.Println("🔔 Starting the reminder service...")
+	StartReminder()
 }
 
-// SendMacNotification sends a desktop notification on macOS
 func SendMacNotification(title, message string) error {
-	// AppleScript command for sending a notification
 	notification := fmt.Sprintf(`display notification "%s" with title "%s"`, message, title)
 	cmd := exec.Command("osascript", "-e", notification)
-	return cmd.Run()
+	err := cmd.Run()
+	if err != nil {
+		logger.Logger.Error().Err(err).Msg("❌ Failed to send macOS notification via AppleScript")
+	}
+	return err
 }
 
-// TestReminder sends a test notification using the current configuration
-func TestReminder(cfg *config.Config) {
-	fmt.Println("Sending test notification...")
+func TestReminder() {
+	fmt.Println("📢 Sending test notification...")
 
-	err := SendDesktopNotification(cfg.Reminder.Title, cfg.Reminder.Message)
+	err := SendDesktopNotification(config.ConfigData.Reminder.Title, config.ConfigData.Reminder.Message)
 	if err != nil {
-		fmt.Printf("Failed to send notification: %v\n", err)
+		logger.Logger.Error().Err(err).Msg("Failed to send test notification")
+		fmt.Printf("❌ Failed to send notification: %v\n", err)
 	} else {
-		fmt.Println("Test notification sent successfully!")
+		fmt.Println("✅ Test notification sent successfully!")
 	}
 }
 
@@ -75,13 +102,7 @@ func NewReminderCommand() *cobra.Command {
 		Use:   "start",
 		Short: "Start the reminder service",
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg, err := config.LoadConfig()
-			if err != nil {
-				logger.Logger.Error().Err(err).Msg("Failed to load configuration")
-				fmt.Printf("Error loading config: %v\n", err)
-				return
-			}
-			StartReminder(cfg)
+			StartReminder()
 		},
 	})
 
@@ -89,12 +110,7 @@ func NewReminderCommand() *cobra.Command {
 		Use:   "test",
 		Short: "Send a test reminder notification",
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg, err := config.LoadConfig()
-			if err != nil {
-				logger.Logger.Error().Err(err).Msg("Failed to load configuration")
-				return
-			}
-			TestReminder(cfg)
+			TestReminder()
 		},
 	})
 

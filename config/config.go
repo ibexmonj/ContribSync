@@ -2,102 +2,79 @@ package config
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
-	"os"
+	"github.com/spf13/viper"
 	"regexp"
 )
 
-// Config structure to represent the YAML config file
 type Config struct {
 	Reminder struct {
-		Time    string `yaml:"time"`
-		Title   string `yaml:"title"`
-		Message string `yaml:"message"`
-	} `yaml:"reminder"`
+		Time    string `mapstructure:"time"`
+		Title   string `mapstructure:"title"`
+		Message string `mapstructure:"message"`
+	} `mapstructure:"reminder"`
 	Plugins struct {
 		Jira struct {
-			Enabled bool   `yaml:"enabled"`
-			BaseURL string `yaml:"base_url"`
-		} `yaml:"jira"`
+			Enabled bool   `mapstructure:"enabled"`
+			BaseURL string `mapstructure:"base_url"`
+		} `mapstructure:"jira"`
 		GitHub struct {
-			Enabled  bool   `yaml:"enabled"`
-			APIToken string `yaml:"api_token"`
-		} `yaml:"github"`
-	} `yaml:"plugins"`
+			Enabled  bool   `mapstructure:"enabled"`
+			APIToken string `mapstructure:"api_token"`
+		} `mapstructure:"github"`
+	} `mapstructure:"plugins"`
 }
 
-// LoadConfig reads the config.yaml file and parses it into the Config struct
-func LoadConfig() (*Config, error) {
-	data, err := os.ReadFile("config.yaml")
-	if err != nil {
-		// If the file doesn't exist, create a new config with defaults
-		if os.IsNotExist(err) {
-			cfg := &Config{}
-			SetDefaults(cfg) // Populate defaults
-			if saveErr := SaveConfig(cfg); saveErr != nil {
-				return nil, saveErr
-			}
-			return cfg, nil
+var ConfigData Config
+
+func LoadConfig() error {
+	viper.SetConfigName("config") // Name of the file (without extension)
+	viper.SetConfigType("yaml")   // File type
+	viper.AddConfigPath(".")      // Look in the current directory
+	viper.AutomaticEnv()          // Support environment variables
+
+	setDefaults()
+
+	if err := viper.ReadInConfig(); err != nil {
+		fmt.Println("⚠️  No config file found. Creating default config.yaml...")
+		if err := SaveConfig(); err != nil {
+			return fmt.Errorf("failed to save default config: %w", err)
 		}
-		return nil, err
 	}
 
-	var config Config
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, err
+	if err := viper.Unmarshal(&ConfigData); err != nil {
+		return fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	// Apply default values to missing fields in an existing config
-	SetDefaults(&config)
-
-	// Optionally save updated config with defaults filled in
-	if saveErr := SaveConfig(&config); saveErr != nil {
-		return nil, saveErr
-	}
-
-	return &config, nil
-}
-
-// SaveConfig writes the updated Config struct back to the YAML file
-func SaveConfig(config *Config) error {
-	data, err := yaml.Marshal(config)
-	if err != nil {
+	if err := ValidateConfig(&ConfigData); err != nil {
 		return err
 	}
-	return os.WriteFile("config.yaml", data, 0644)
+
+	return nil
 }
 
-// ValidateConfig checks if the configuration values are valid
+func SaveConfig() error {
+	if err := viper.WriteConfigAs("config.yaml"); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+	return nil
+}
+
 func ValidateConfig(cfg *Config) error {
-	// Validate reminder time format (HH:MM)
 	timeFormat := regexp.MustCompile(`^(?:[01]\d|2[0-3]):[0-5]\d$`) // Matches 00:00 to 23:59
 	if !timeFormat.MatchString(cfg.Reminder.Time) {
 		return fmt.Errorf("invalid reminder time format: %s (expected HH:MM)", cfg.Reminder.Time)
 	}
-
-	// Add more validations here as 	needed
 	return nil
 }
 
-func SetDefaults(cfg *Config) {
-	// Set default reminder time
-	if cfg.Reminder.Time == "" {
-		cfg.Reminder.Time = "17:00"
-	}
-	// Set default reminder title
-	if cfg.Reminder.Title == "" {
-		cfg.Reminder.Title = "Contribution Reminder"
-	}
-	// Set default reminder message
-	if cfg.Reminder.Message == "" {
-		cfg.Reminder.Message = "Don't forget to log your contributions!"
-	}
+func setDefaults() {
+	viper.SetDefault("reminder.time", "17:00")
+	viper.SetDefault("reminder.title", "Contribution Reminder")
+	viper.SetDefault("reminder.message", "Don't forget to log your contributions!")
 
-	// Add defaults for other fields as needed
-	if cfg.Plugins.Jira.BaseURL == "" {
-		cfg.Plugins.Jira.BaseURL = ""
-	}
-	if cfg.Plugins.GitHub.APIToken == "" {
-		cfg.Plugins.GitHub.APIToken = ""
-	}
+	viper.SetDefault("plugins.jira.enabled", false)
+	viper.SetDefault("plugins.jira.base_url", "")
+
+	viper.SetDefault("plugins.github.enabled", false)
+	viper.SetDefault("plugins.github.api_token", "")
 }
