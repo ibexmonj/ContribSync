@@ -3,23 +3,43 @@
 
 ⚠️ **This is an early-stage open-source project.**
 
+> ⚡️ Stop dreading performance reviews. Start tracking your work effortlessly.
 
-ContribSync (`csync`) is a CLI tool that helps individual contributors track their work across multiple platforms, generate AI-powered summaries, and streamline performance reviews.
+**ContribSync** is a CLI tool that automatically fetches your contributions from Jira, GitHub, and more—then generates a clean, AI-powered self-evaluation draft.  
+It's built for engineers who want to spend 2 minutes, not 2 days, preparing for performance reviews.
+
+---
+
+## ✨ Why Use ContribSync?
+
+Every quarter, we scramble to remember what we actually shipped. Hunting through Jira tickets, pull requests, and Slack threads wastes time and leads to incomplete self-reviews.
+
+**ContribSync automates that painful process.**  
+It connects to the tools you're already using and summarizes what you’ve done—so you can focus on impact, not busywork.
+
+---
+
 
 ## 📌 Features
 
 ### ✅ Jira Integration
-- **Create issues** in Jira directly from the CLI.
-- **List issues** in a given Jira project.
-- **Find issues assigned to a user.**
-- **Generate AI-powered summaries** of Jira contributions for self-evaluations (using OpenAI GPT-3.5).
+- Fetches assigned tickets from Jira (JQL-based)
+- Summarizes tickets using GPT-3.5 / GPT-4
+- Outputs clean Markdown for performance reviews
 
-### ✅ Pluggable Architecture
-- Built to **support multiple integrations** (e.g., GitHub, GitLab, Slack, Teams in the future).
+### ✅ GitHub Plugin
+- Lists PRs created or merged in a timeframe
+- Extracts commit messages and PR descriptions
+- Generates activity summaries via AI
 
-### ✅ Automated Summarization
-- Converts Jira activity into a **structured, self-evaluation-friendly summary**.
-- Helps users **document their contributions efficiently** for performance reviews.
+### ✅ Slack Plugin (WIP)
+- Sends daily or weekly contribution reminder notifications
+- Future: Slack-based input capture for non-CLI users
+
+### ✅ AI-Powered Summaries
+- Uses OpenAI to turn raw issue/PR data into concise summaries
+- Fully configurable prompt structure
+- Offline/manual mode available for auditability
 
 
 ## 🛠️ Setup & Running Locally
@@ -51,6 +71,13 @@ Before running commands, ensure the required environment variables are set.
 export JIRA_BASE_URL=https://your-org.atlassian.net
 export JIRA_API_TOKEN=your-api-token
 export JIRA_EMAIL="your-email@example.com"
+
+# Optional: GitHub
+GITHUB_TOKEN=ghp_...
+
+# Optional: Slack
+SLACK_WEBHOOK_URL=https://hooks.slack.com/...
+
 ```
 
 ✅ (Optional) OpenAI API Configuration
@@ -145,6 +172,19 @@ Sample Output:
 This project is evolving, and we’re actively adding new integrations and improvements.
 Watch this space for updates! 🚀
 
+## 🧩 Plugin System
+
+ContribSync is built to be extensible. Add your own integrations via plugins under pkg/plugins.
+
+Available plugins:
+•	Jira  
+•	GitHub  
+•	Slack (WIP)  
+
+## 🧠 Powered by OpenAI
+
+ContribSync uses the OpenAI API to generate human-readable summaries. You control the prompt format and engine (gpt-3.5-turbo or gpt-4).
+
 ## 📜 License
 
 This project is licensed under the [MIT License.](LICENSE)
@@ -152,6 +192,15 @@ This project is licensed under the [MIT License.](LICENSE)
 ## 🤝 Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute.
+
+We’re actively building this and looking for contributors!
+
+Ways to contribute:  
+•	Add a new platform plugin (Linear, GitLab, Trello)  
+•	Improve AI summarization prompts  
+•	Build a simple TUI/GUI wrapper  
+•	Add caching / config improvements  
+•	Write tests and docs  
 
 ## 🛠️ Future Roadmap
 •	Refactor cli command structure . E.g. "csync plugin exec jira..." to "csync jira..."
